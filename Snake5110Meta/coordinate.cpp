@@ -1,5 +1,4 @@
 #include "coordinate.h"
-#include <Gamebuino-Compat.h>
 
 Coordinate Coordinate::g_nomPos = Coordinate();
 Coordinate Coordinate::g_growNomPos = Coordinate(); // only for new mode

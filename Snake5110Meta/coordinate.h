@@ -14,20 +14,23 @@ static Coordinate g_snakePos; // contains head position of the snake, used for c
 
     Coordinate() : m_x(0), m_y(0) {}
     // positions are in raster resolution, not pixel resolution
-    /// isInRaster means the snake raster 20x11!
+    /// isInRaster means the snake raster 20x11(Gamebuino classic) / 19x15 (Gamebuino Meta)!
     Coordinate(int8_t x, int8_t y, bool isInRaster = true) :
         m_x(x), m_y(y)
     {
         if (isInRaster)
             return;
-        /// TODO: implement case !isInRaster, maybe relevant for porting to Gamebuino Meta
     }
     
     bool operator==(const Coordinate& other) const
         { return m_x == other.m_x and m_y == other.m_y; }
     bool operator!=(const Coordinate& other) const
         { return !(*this == other); }
-        
+    
+    void set2Position(int8_t x, int8_t y)
+    { m_x = x; m_y = y; }
+    
+    
     inline int8_t x() const { return m_x; }
     /// converts raster value to pixel value for drawing
     inline int8_t xPixel() const { return m_x*4+2; }

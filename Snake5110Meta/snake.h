@@ -1,6 +1,5 @@
 #pragma once
 #include <Arduino.h>
-#include <Gamebuino-Compat.h>
 #include "globalVariables.h"
 #include "coordinate.h"
 /** ******************   SNAKE CLASS DECLARATION: */
@@ -21,30 +20,30 @@ struct Snake
     
     void reset()
     {
-        for(int8_t index = 0; index < m_snakeSize ; index++)
-            { m_snakeCoordinates[index] = Coordinate(); }
-        m_snakeSize = 0;
+      for(int8_t index = 0; index < m_snakeSize ; index++)
+        { m_snakeCoordinates[index] = Coordinate(); }
+      m_snakeSize = 0;
     }
     
     /// == contains
     bool isPartOfSnake(const Coordinate& checkPos, bool checkHead = false) const
     {
-        int8_t index = 0;
-        if (!checkHead)
-            index = 1;
-        for(; index < m_snakeSize; index++)
-        {
-            if (checkPos == m_snakeCoordinates[index])
-                return true;
-        }
-        return false;
+      int8_t index = 0;
+      if (!checkHead)
+        index = 1;
+      for(; index < m_snakeSize; index++)
+      {
+        if (checkPos == m_snakeCoordinates[index])
+          return true;
+      }
+      return false;
     }
     
     void moveCoordinates(const Coordinate& newHead)
     {
-        for(int8_t index = m_snakeSize; index > 0 ; index--)
-            { m_snakeCoordinates[index] = m_snakeCoordinates[index-1]; }
-        m_snakeCoordinates[0] = newHead;
+      for(int8_t index = m_snakeSize; index > 0 ; index--)
+        { m_snakeCoordinates[index] = m_snakeCoordinates[index-1]; }
+      m_snakeCoordinates[0] = newHead;
     }
     
     /// sets the coordinate to a new random position that is not in use.
