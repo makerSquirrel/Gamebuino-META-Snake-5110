@@ -1,5 +1,5 @@
 # Gamebuino-META-Snake-5110
-A Gamebuino META version (https://gamebuino.com/)  of the Snake 5110 game originally programmed for the Gamebuino Classic. The Gamebuino META version is still in development, but in an early stage. If interested in a fully working Gamebuino Classic version (fully compatible with MAKERbuino, https://www.makerbuino.com/), check out: https://github.com/makerSquirrel/Gamebuino-Classic-Snake-5110 .
+A Gamebuino META version (https://gamebuino.com/)  of the Snake 5110 game originally programmed for the Gamebuino Classic. If interested in a fully working Gamebuino Classic version (fully compatible with MAKERbuino, https://www.makerbuino.com/), check out: https://github.com/makerSquirrel/Gamebuino-Classic-Snake-5110 .
 
 A Snake clone (made by Lady Awesome and MakerSquirrel, with modified highscore code found in a R0d0t game ;) ).
 This version orients itself on Snake 1, which was running on the original Nokia 5110 (hence the name ;) )
@@ -19,3 +19,5 @@ Since both versions are of different difficulty, they have different Highscores.
 Version history:
 
 v0.1: Oct14-2018, so buggy that it does crash when entering the menu.
+v0.8: Oct20-2018, mostly working, but no sound and some minor bugs exist.
+v1.0: Nov01-2018, works. Please report bugs if you find any!
