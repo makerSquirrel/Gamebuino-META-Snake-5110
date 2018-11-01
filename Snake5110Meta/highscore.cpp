@@ -12,7 +12,7 @@ uint16_t HighScore::getCurrentOffset()
 
 bool HighScore::showScore(uint16_t score)
 {
-    bool isHighScore = score > m_minHighScore ? true : false;
+  bool isHighScore = checkHighScore(score);
     while (true) {
         if (!gb.update())
             continue;

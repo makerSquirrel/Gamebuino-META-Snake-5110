@@ -9,7 +9,7 @@ public:
 static Coordinate g_nomPos;
 static Coordinate g_growNomPos; // only for new mode
 static Coordinate g_shrinkNomPos; // only for new mode
-static Coordinate g_wallNomPos; // only for new mode, TODO: need to store open Walls! only one xpos-hole-array and a yPos hole array needed!
+static Coordinate g_wallNomPos;
 static Coordinate g_snakePos; // contains head position of the snake, used for convenience only
 
     Coordinate() : m_x(0), m_y(0) {}

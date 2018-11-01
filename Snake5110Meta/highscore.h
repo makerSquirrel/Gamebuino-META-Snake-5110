@@ -36,6 +36,10 @@ public:
 /// returns true if given value is a new highscore:
 bool showScore(uint16_t score);
 
+/// simple check, returns true if new highscore
+inline bool checkHighScore(uint16_t score)
+  { return score > m_minHighScore ? true : false; }
+
 void updateHighscore(uint16_t newHighScore); // writes highscore to SD Card, should not be called more often than needed (i.e. only if showScore returns true)
 
 void drawHighScores(); // prints highscores to screen, but only valid entries if loadHighscores() was called before at least once.
