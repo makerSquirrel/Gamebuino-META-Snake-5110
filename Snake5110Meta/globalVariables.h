@@ -22,7 +22,7 @@ volatile static int16_t g_cpuLoad; // for debugging
 volatile static int16_t g_ramUsage; // for debugging
 volatile static int8_t g_gameLevel; // max level 9
 volatile static int8_t g_delayCounter;
-volatile static int8_t g_lastButtonPressed; /// stores the last button that was pressed 
+volatile static int8_t g_lastButtonPressed; /// stores the last button that was pressed
 volatile static int8_t g_lastTimeButtonPressed; ///  stores the button that was pressed in the previous time step (used for preventing kills by clicking backwards)
 volatile static int8_t g_levelModuloHelper; // small helper to store the modulo value to handle game level
 extern const uint8_t font5x7[];

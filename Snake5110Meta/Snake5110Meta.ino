@@ -1,102 +1,112 @@
-#include <Gamebuino-Compat.h>
-#include <Gamebuino-EEPROM.h>
-
+#include <Gamebuino-Meta.h>
 #include "globalVariables.h"
 #include "coordinate.h"
+#include "config-gamebuino.h"
 #include "snake.h"
+#include "menuimages.h"
+#include "highscore.h"
+#include "soundfx.h"
 
 Snake g_snake;
 
 /// CC-BY-SA 2018 by Lady Awesome and MakerSquirrel, original Highscore code by Rodot (here a modified version in use)
 
 /** ******************   GLOBAL SHIT: */
-/// new mode
-static int16_t g_highscoreScores[HIGHSCORE_COUNT];
-static char g_highscoreNames[HIGHSCORE_COUNT][NAME_LETTERS + 1];
-static int16_t g_minHighscore;
 static uint8_t g_xWallsRemaining;
 static uint8_t g_yWallsRemaining;
 /// classic mode
-static int16_t g_highScoresClassic[HIGHSCORE_COUNT];
-static char g_highScoreNamesClassic[HIGHSCORE_COUNT][NAME_LETTERS + 1];
-static int16_t g_minHighScoreClassic;
+// #define BGCOLORCLASSICBLUE gb.createColor(206, 221, 231)
+struct CustomColors {
+  static const Color s_bgNokiaGreen;
+  static const Color s_bgClassicBlue;
+  static const Color s_bgNokiaBlue;
+};
+const Color CustomColors::s_bgNokiaGreen = gb.createColor(185, 199, 0);
+const Color CustomColors::s_bgClassicBlue = gb.createColor(206, 221, 231);
+const Color CustomColors::s_bgNokiaBlue = gb.createColor(158, 170, 197);
+// Color g_colorNom;
+Color g_colorNom = Color(BLACK);
 
-const char g_startGame[] PROGMEM = "Start Game";
-const char g_startClassic[] PROGMEM = "Start Classic";
-const char g_showHighscore[] PROGMEM = "Highscore"; //"Show Highscore";
-const char g_setDifficulty[] PROGMEM = "Difficulty"; //"Set Game difficulty";
-const char g_goToTitleScreen[] PROGMEM = "Titlescreen"; //"Back to Titlescreen";
-const char g_goCredits[] PROGMEM = "Credits";
 
-#define MAINMENU_LENGTH 6
-const char* const g_mainMenu[MAINMENU_LENGTH] PROGMEM = {
-  g_startGame,
-  g_startClassic,
-  g_showHighscore,
-  g_setDifficulty,
-  g_goToTitleScreen,
-  g_goCredits
+HighScore g_classicHighscore = HighScore("Classic", g_colorNom, CustomColors::s_bgNokiaGreen);
+#define SAVE_CLASSIC 0
+HighScore g_metaHighscore = HighScore("Meta", g_colorNom, CustomColors::s_bgClassicBlue);
+#define SAVE_META 1
+HighScore g_snake2Highscore = HighScore("Snake 2", g_colorNom, CustomColors::s_bgNokiaBlue);
+#define SAVE_SNAKE2 2
+
+struct GameSettings{
+  Color bgColor;
+  Color wallColor;
+  int8_t level;
+  int8_t bgColorType; // classic blue, nokia green and nokia blue
+  int8_t wallColorType; // orange, grey.
+  bool snakeStyle; // false: like Snake 1, true: like Snake 2
+  bool allowSpeedUp;
+  bool alwaysShowScore; // if true, score is always shown
+  bool initialized; // used to determine if settings were loaded
+  GameSettings() :
+    bgColor(CustomColors::s_bgClassicBlue),
+    wallColor(ORANGE),
+    level(5), bgColorType(0), wallColorType(0),
+    snakeStyle(false), allowSpeedUp(false), alwaysShowScore(false), initialized(true) {}
+  void setBgColor(const Color& newColor) { bgColor = newColor; }
+  void setBgColorByType(int8_t newType)
+  {
+    if(newType < 0 || newType > 2) return;
+    bgColorType = newType;
+    if (newType == 0)
+      bgColor = CustomColors::s_bgClassicBlue;
+    else if (newType == 1)
+      bgColor = CustomColors::s_bgNokiaGreen;
+    else if (newType == 2)
+      bgColor = CustomColors::s_bgNokiaBlue;
+  }
+
+  void setWallColor(const Color& newColor) { wallColor = newColor; }
+  void setWallColorByType(int8_t newType)
+  {
+    if(newType < 0 || newType > 2) return;
+    wallColorType = newType;
+    if (newType == 0)
+      wallColor = ORANGE;
+    else if (newType == 1)
+      wallColor = GRAY;
+  }
 };
 
-/// logo coded in PROGMEM puffer:
-const uint8_t Snake5110Logo[] PROGMEM = {64,36,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0xFE,0x47,0xF2,0xF,0xE1,0xC0,0x8F,0xE4,
-0xFE,0xA7,0xF5,0xF,0xE1,0xC1,0x4F,0xEA,
-0xFE,0x47,0xF2,0xF,0xE1,0xC0,0x8F,0xE4,
-0xE0,0x7,0x70,0x3E,0xF9,0xC0,0xE,0x0,
-0xE0,0x7,0x77,0x3E,0xF9,0xDF,0xCE,0x0,
-0xE0,0x7,0x77,0x3E,0xF9,0xDF,0xCE,0x0,
-0xE0,0x7,0x77,0x38,0x39,0xDF,0xCE,0x0,
-0xE0,0x7,0x77,0x3F,0xB9,0xFC,0xF,0xFE,
-0xE0,0x7,0x77,0x3F,0xB9,0xFC,0xF,0xFE,
-0xFF,0xE7,0x77,0x3F,0xB9,0xFC,0xF,0xFE,
-0xFF,0xE7,0x77,0x3,0xB8,0x0,0x0,0xE,
-0xFF,0xE7,0x77,0x3F,0xB9,0xFC,0xF,0xFE,
-0x0,0xE7,0x77,0x3F,0xB9,0xFC,0xF,0xFE,
-0x0,0xE7,0x77,0x3F,0xB9,0xFC,0xF,0xFE,
-0x0,0xE7,0x77,0x38,0x39,0xDF,0xCE,0x0,
-0x0,0xE7,0x77,0x38,0x39,0xDF,0xCE,0x0,
-0x0,0xE7,0x77,0x38,0x39,0xDF,0xCE,0x0,
-0x0,0xE7,0x77,0x0,0x38,0x1,0xCE,0x0,
-0xFF,0xE7,0x7F,0x10,0x38,0x81,0xCF,0xFE,
-0xFF,0xE7,0x7F,0x28,0x39,0x41,0xCF,0xFE,
-0xFF,0xE7,0x7F,0x10,0x38,0x81,0xCF,0xFE,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-0x0,0x0,0x0,0x0,0x0,0x0,0xF2,0x4E,
-0x0,0x0,0x0,0x0,0x0,0x0,0x86,0xD1,
-0x0,0x0,0x0,0x0,0x0,0x0,0xE2,0x51,
-0x0,0x0,0x0,0x0,0x0,0x0,0x12,0x51,
-0x0,0x0,0x0,0x0,0x0,0x0,0x12,0x51,
-0x0,0x0,0x0,0x0,0x0,0x0,0xE2,0x4E,
+GameSettings g_gameSettings = GameSettings();
+#define SAVE_SETTINGS 3
+
+const SaveDefault savefileDefaults[] = {
+  { SAVE_CLASSIC, SAVETYPE_BLOB, sizeof(g_classicHighscore), 0 },
+  { SAVE_META, SAVETYPE_BLOB, sizeof(g_metaHighscore), 0 },
+  { SAVE_SNAKE2, SAVETYPE_BLOB, sizeof(g_snake2Highscore), 0 },
+  { SAVE_SETTINGS, SAVETYPE_BLOB, sizeof(g_gameSettings), 0 }
 };
+
 
 /** ******************   FUNCTION DEFINITIONS: */
 
 
 bool isXWallRemoved(int8_t val)
 {
-    if (val < 0 || val > c_rasterX)
+    if (val < 0 || val >= c_rasterX)
         return false;
     return g_xWallsRemoved[val];
 }
 
+
 bool isYWallRemoved(int8_t val)
 {
-    if (val < 0 || val > c_rasterY)
+    if (val < 0 || val >= c_rasterY)
         return false;
     return g_yWallsRemoved[val];
 }
 
-/// check if out of bounds (not in arena and )
-bool isOutOfBounds(const Coordinate& pos) 
+
+/// check if out of bounds (not in arena and not in the walls)
+bool isOutOfBounds(const Coordinate& pos)
 {
     if (pos.isInArena())
         return false;
@@ -167,192 +177,333 @@ void deleteRandomWallElement()
 void setup()
 {
   gb.begin();
-  g_gameLevel = 1;
-  gb.battery.show = false; //hide the battery indicator
-  showTitleScreen();
-  loadHighscores(false);
-  loadHighscores(true);
+
   g_cpuLoad = 0;
   g_ramUsage = 0;
+  gb.display.init(80, 64, ColorMode::rgb565);
+  gb.save.config(savefileDefaults);
+  gb.save.get(SAVE_SETTINGS, g_gameSettings);
+  if (!g_gameSettings.initialized)
+    g_gameSettings = GameSettings();
+  gb.display.setColor(BLACK, CustomColors::s_bgClassicBlue);
+  gb.save.get(SAVE_CLASSIC, g_classicHighscore);
+  g_classicHighscore.setName("Classic");
+  g_classicHighscore.setTextColor(g_colorNom);
+  g_classicHighscore.setBgColor(CustomColors::s_bgNokiaGreen);
+  gb.save.get(SAVE_META, g_metaHighscore);
+  g_metaHighscore.setName("Meta");
+  g_metaHighscore.setTextColor(g_colorNom);
+  g_metaHighscore.setBgColor(CustomColors::s_bgClassicBlue);
+  gb.save.get(SAVE_META, g_snake2Highscore);
+  g_snake2Highscore.setName("Snake 2");
+  g_snake2Highscore.setTextColor(g_colorNom);
+  g_snake2Highscore.setBgColor(CustomColors::s_bgClassicBlue);
 }
 
 
-void showTitleScreen()
-{
-    gb.display.setFont(font5x7);
-    gb.titleScreen(F(""), Snake5110Logo);
-}
-
-
-/// loop function, mostly used for menu only
+/// loop function
 void loop()
 {
+  menuLoop();
+}
+
+
+void menuLoop()
+{
+  gb.display.setFont(font5x7);
+  Image menuImg(Snake5110metaMenuMain);
+  uint8_t menuXPos = 0;
+  uint8_t menuYPos = 0;
+  while(true)
+  {
     if(!gb.update())
-        return;
-    gb.display.setFont(font5x7);
-    int menuValue = gb.menu(g_mainMenu,MAINMENU_LENGTH);
-    
-    if (menuValue == 0) // Start Game
+      continue;
+    gb.display.clear();
+    gb.display.setColor(BLACK, g_gameSettings.bgColor);
+    gb.display.drawImage(0, 0, menuImg);
+
+    if (gb.buttons.repeat(BUTTON_UP, 4) && menuYPos > 0)
+      menuYPos--;
+    if (gb.buttons.repeat(BUTTON_DOWN, 4) && menuYPos < 2)
+      menuYPos++;
+    if (gb.buttons.repeat(BUTTON_LEFT, 4) && menuXPos > 0)
+      menuXPos--;
+    if (gb.buttons.repeat(BUTTON_RIGHT, 4) && menuXPos < 1)
+      menuXPos++;
+
+    setMenuCursor(menuXPos, menuYPos);
+
+    if (!gb.buttons.pressed(BUTTON_A) && !gb.buttons.pressed(BUTTON_B))
+      continue;
+    if (menuXPos == 0 && menuYPos == 0) // Start Game
     {
-        initGame(false);
-        gameLoop();
+      initGame(false);
+      gameLoop();
     }
-    else if (menuValue == 1) // Use the classic start
+    else if (menuXPos == 1 && menuYPos == 0) // Use the classic start
     {
-        initGame(true);
-        gameLoop();
+      initGame(true);
+      gameLoop();
     }
-    else if (menuValue == 2) // Show Highscore
+    else if (menuXPos == 0 && menuYPos == 1) // Show Highscore
     {
-        showHighscore(true);
-        showHighscore(false);
+      g_classicHighscore.drawHighScores();
+      g_metaHighscore.drawHighScores();
     }
-    else if (menuValue == 3) // Set Game difficulty
-        { setDifficulty(); }
-    else if (menuValue == 4) // Back to Titlescreen
-        { showTitleScreen(); }
-    else if (menuValue == 5) // Show the credits
-        { showCredits(); }
-    else
-        { showTitleScreen(); }
+    else if (menuXPos == 1 && menuYPos == 1) // Set Game difficulty
+      setDifficulty();
+    else if (menuYPos == 2) // Show the credits
+      showCredits();
+  }
+}
+
+
+// basically a rect around current menu selection
+void setMenuCursor(uint8_t xSelect, uint8_t ySelect)
+{
+  xSelect = ySelect == 2 || xSelect == 0 ? 1 : 40;
+  uint8_t height = ySelect == 2 ? 9 : 25;
+  uint8_t width = ySelect == 2 ? 77 : 38;
+  ySelect = ySelect == 0 ? 0 : ySelect == 1 ? 27 : 54;
+  gb.display.setColor(WHITE);
+  gb.display.drawRect(xSelect, ySelect,width, height);
 }
 
 
 /// game loop function
 void gameLoop()
 {
-  int8_t lastTimeButtonPressed = PAUSE; /// explicitly stores the button pressed last time step
-    while(true)
+  while(true)
+  {
+    if(!gb.update())
+      { continue; }
+    gb.display.clear();
+
+    if(gb.buttons.pressed(BUTTON_MENU))
+      { return; }
+
+    if (c_debug)
     {
-        if(!gb.update())
-            { continue; }
-            
-        if(gb.buttons.pressed(BTN_C))
-            { return; }
-            
-        if (c_debug)
-        {
-          gb.display.cursorX = 3;
-          gb.display.cursorY = 10;
-          gb.display.setColor(BLACK, WHITE);
-          gb.display.println(Coordinate::g_snakePos.x());
-          gb.display.cursorX = 3;
-          gb.display.println(Coordinate::g_snakePos.y());
-        //   gb.display.cursorX = 3;
-        //   gb.display.println(g_snake.size());
-//         if (wallCollision() || snakeBite() || postGameCnt != 0)
-//             postGameCnt++;
-        }
-        
-        if(wallCollision())
-            { gameOver(true); return; }
-        if(snakeBite())
-            { gameOver(false); return; }
-            
-        g_delayCounter++;
-        bool timeChanged = false;
-
-        if ((g_delayCounter % g_levelModuloHelper) == 0)
-            timeChanged = true;
-        drawArena();
-
-        /// for new mode: ignore button presses where snake would turn backwards, old mode: die at that point
-        if (gb.buttons.repeat(BTN_UP, 1))
-        { g_lastButtonPressed = g_isClassicMode ? UP : (lastTimeButtonPressed == DOWN) ? lastTimeButtonPressed : UP; }
-        else if (gb.buttons.repeat(BTN_RIGHT,1))
-        {g_lastButtonPressed = g_isClassicMode ? RIGHT : (lastTimeButtonPressed == LEFT) ? lastTimeButtonPressed : RIGHT; }
-        else if (gb.buttons.repeat(BTN_DOWN, 1))
-        {g_lastButtonPressed = g_isClassicMode ? DOWN : (lastTimeButtonPressed == UP) ? lastTimeButtonPressed : DOWN; }
-        else if (gb.buttons.repeat(BTN_LEFT, 1))
-        { g_lastButtonPressed = g_isClassicMode ? LEFT : (lastTimeButtonPressed == RIGHT) ? lastTimeButtonPressed : LEFT; }
-        else if (gb.buttons.repeat(BTN_B, 1) || gb.buttons.repeat(BTN_A, 1))
-        {
-          g_lastButtonPressed = PAUSE;
-          if (lastTimeButtonPressed != g_lastButtonPressed)
-            gb.popup("Pause",9);
-        }
-        if (timeChanged)
-          lastTimeButtonPressed = g_lastButtonPressed;
-
-        drawSnake(g_lastButtonPressed, timeChanged);
-        if (g_lastButtonPressed != PAUSE && timeChanged && snakeHasPrey())
-            { setNewNomPos(); }
-        drawPrey();
+      gb.display.cursorX = 3;
+      gb.display.cursorY = 10;
+      gb.display.setColor(BLACK);
+      gb.display.println(Coordinate::g_snakePos.x());
+      gb.display.cursorX = 3;
+      gb.display.println(Coordinate::g_snakePos.y());
     }
+
+    if(wallCollision())
+      { gameOver(true); return; }
+    if(snakeBite())
+      { gameOver(false); return; }
+
+    g_delayCounter++;
+    bool timeChanged = false;
+
+    if ((g_delayCounter % g_levelModuloHelper) == 0)
+      timeChanged = true;
+    drawArena();
+    gb.display.setColor(g_gameSettings.bgColor);
+
+    /// for new mode: ignore button presses where snake would turn backwards, old mode: die at that point
+    if (gb.buttons.repeat(BUTTON_UP, 1))
+    { g_lastButtonPressed = g_isClassicMode ? UP : (g_lastTimeButtonPressed == DOWN) ? g_lastTimeButtonPressed : UP; }
+    else if (gb.buttons.repeat(BUTTON_RIGHT,1))
+    {g_lastButtonPressed = g_isClassicMode ? RIGHT : (g_lastTimeButtonPressed == LEFT) ? g_lastTimeButtonPressed : RIGHT; }
+    else if (gb.buttons.repeat(BUTTON_DOWN, 1))
+    {g_lastButtonPressed = g_isClassicMode ? DOWN : (g_lastTimeButtonPressed == UP) ? g_lastTimeButtonPressed : DOWN; }
+    else if (gb.buttons.repeat(BUTTON_LEFT, 1))
+    { g_lastButtonPressed = g_isClassicMode ? LEFT : (g_lastTimeButtonPressed == RIGHT) ? g_lastTimeButtonPressed : LEFT; }
+    else if (gb.buttons.repeat(BUTTON_B, 1) || gb.buttons.repeat(BUTTON_A, 2))
+    {
+      g_lastButtonPressed = PAUSE;
+      if (g_lastTimeButtonPressed != g_lastButtonPressed)
+        gb.gui.popup("Pause",9);
+    }
+    if (timeChanged)
+      g_lastTimeButtonPressed = g_lastButtonPressed;
+
+    drawSnake(g_lastButtonPressed, timeChanged);
+    if (g_lastButtonPressed != PAUSE && timeChanged && snakeHasPrey())
+        { setNewNomPos(); }
+    drawPrey();
+  }
 }
 
 
 /// set difficulty:
 void setDifficulty()
 {
+  Coordinate::g_snakePos.set2Position(2, 10);
+  g_snake.reset();
+  g_snake.addCoordinate(Coordinate::g_snakePos);
+  g_snake.addCoordinate(Coordinate(1,10));
+  g_snake.addCoordinate(Coordinate(0,10));
+  g_delayCounter = 0;
+  gb.display.setFont(font5x7);
+  auto settingsPos = 0;
+  auto bgColorPos = g_gameSettings.bgColorType;
+  auto wallColorPos = g_gameSettings.wallColorType;
+  while(1){
+    if(!gb.update())
+      continue;
     gb.display.clear();
-    gb.display.setFont(font5x7);
-    while(1){
-        if(!gb.update())
-            continue;
-        
-        if(gb.buttons.pressed(BTN_C) or gb.buttons.pressed(BTN_A))
-            { return; }
-        
-        if(g_gameLevel > 1 and (gb.buttons.repeat(BTN_LEFT, 2) or gb.buttons.repeat(BTN_DOWN, 2)))
-            g_gameLevel--;
-        if(g_gameLevel < c_maxLevel and (gb.buttons.repeat(BTN_RIGHT, 2) or gb.buttons.repeat(BTN_UP, 2)))
-            g_gameLevel++;
-        
-        gb.display.print(F("Difficulty: "));
-        gb.display.print(g_gameLevel);
-        
-        uint8_t xPos = 8;
-        uint8_t yPos = 40;
-        for(uint8_t i = 0; i < c_maxLevel ; i++)
-        {
-            uint8_t currentHeight= (i+1)*4 + 1;
-         
-            gb.display.drawFastVLine(xPos+5, yPos, currentHeight + 1);
-            gb.display.drawFastHLine(xPos, yPos+currentHeight+1, 6);
-            
-            if (i < g_gameLevel)
-            { gb.display.fillRect(xPos, yPos,4,currentHeight); }
-            
-            xPos += 8;
-            yPos -= 4;
-        } 
+    gb.display.setColor(CustomColors::s_bgClassicBlue);
+    gb.display.fillRect(0, 0, gb.display.width(), gb.display.height());
+    gb.display.setColor(ORANGE);
+    gb.display.drawRect(0, 0, gb.display.width(), gb.display.height());
+    gb.display.setColor(BLACK);
+
+    if(gb.buttons.pressed(BUTTON_MENU) || gb.buttons.pressed(BUTTON_A) || gb.buttons.pressed(BUTTON_B))
+    {
+      gb.save.set( SAVE_SETTINGS , g_gameSettings );
+      return;
     }
-}
 
+    /// handle settings
+    if (settingsPos > 0 && gb.buttons.repeat(BUTTON_UP, 2))
+      settingsPos--;
+    if (settingsPos < 2 && gb.buttons.repeat(BUTTON_DOWN, 2))
+      settingsPos++;
+    if (settingsPos == 0 && g_gameSettings.level > 1 && gb.buttons.repeat(BUTTON_LEFT, 2))
+        g_gameSettings.level--;
+    else if (settingsPos == 0 && g_gameSettings.level < c_maxLevel && gb.buttons.repeat(BUTTON_RIGHT, 2))
+        g_gameSettings.level++;
+    else if (settingsPos == 1 && bgColorPos < 2 && gb.buttons.repeat(BUTTON_RIGHT, 2))
+        bgColorPos++;
+    else if (settingsPos == 1 && bgColorPos > 0 && gb.buttons.repeat(BUTTON_LEFT, 2))
+        bgColorPos--;
+    else if (settingsPos == 2 && wallColorPos < 1 && gb.buttons.repeat(BUTTON_RIGHT, 2))
+        wallColorPos++;
+    else if (settingsPos == 2 && wallColorPos > 0 && gb.buttons.repeat(BUTTON_LEFT, 2))
+        wallColorPos--;
+    g_levelModuloHelper = c_maxLevel + 1 - g_gameSettings.level;
+    g_gameSettings.setBgColorByType(bgColorPos);
+    g_gameSettings.setWallColorByType(wallColorPos);
 
-void showHighscore(bool useClassicMode)
-{
-    gb.display.setFont(font3x5);
-    drawHighScores(useClassicMode);
+    gb.display.cursorX = 3;
+    gb.display.cursorY = 3;
+    gb.display.print(F("Difficulty: "));
+    gb.display.print(g_gameSettings.level);
+
+    gb.display.cursorX = 3;
+    gb.display.cursorY = gb.display.height()-16;
+    gb.display.println(F("BG Color: "));
+    gb.display.cursorX = 3;
+    gb.display.cursorY = gb.display.height()-8;
+    gb.display.println(F("Wall Color: "));
+    // gb.display.print(settingsPos);
+
+    gb.display.setColor(WHITE);
+    if (settingsPos == 0)
+      gb.display.drawRect(2, 2, 58, 7);
+    else if (settingsPos == 1)
+      gb.display.drawRect(2, gb.display.height()-17, 38, 7);
+    else if (settingsPos == 2)
+      gb.display.drawRect(2, gb.display.height()-9, 45, 7);
+    gb.display.setColor(BLACK);
+
+    uint8_t xPos = 11;
+    uint8_t yPos = 36;
+    for(uint8_t i = 0; i < c_maxLevel ; i++)
+    { // difficulty part
+      uint8_t currentHeight= (i+1)*4 -1;
+      gb.display.drawFastVLine(xPos+5, yPos, currentHeight + 1);
+      gb.display.drawFastHLine(xPos, yPos+currentHeight+1, 6);
+
+      if (i < g_gameSettings.level)
+      { gb.display.fillRect(xPos, yPos,4,currentHeight); }
+
+      xPos += 7;
+      yPos -= 4;
+    }
+
+    /// snake animation part:
+    g_delayCounter++;
+    bool timeChanged = false;
+
+    if ((g_delayCounter % g_levelModuloHelper) == 0)
+      timeChanged = true;
+    if (Coordinate::g_snakePos.x() > 17)
+      Coordinate::g_snakePos.set2Position(1, 10);
+    drawSnake(RIGHT, timeChanged);
+
+    /// color selection part:
+    //bgColor
+    gb.display.setColor(CustomColors::s_bgClassicBlue);
+    gb.display.fillRect(48, gb.display.height()-16, 5, 5);
+    gb.display.setColor(ORANGE);
+    gb.display.drawRect(47, gb.display.height()-17, 7, 7);
+    gb.display.setColor(CustomColors::s_bgNokiaGreen);
+    gb.display.fillRect(56, gb.display.height()-16, 5, 5);
+    gb.display.setColor(ORANGE);
+    gb.display.drawRect(55, gb.display.height()-17, 7, 7);
+    gb.display.setColor(CustomColors::s_bgNokiaBlue);
+    gb.display.fillRect(64, gb.display.height()-16, 5, 5);
+    gb.display.setColor(ORANGE);
+    gb.display.drawRect(63, gb.display.height()-17, 7, 7);
+    // wall color:
+    gb.display.setColor(ORANGE);
+    gb.display.fillRect(52, gb.display.height()-8, 5, 5);
+    gb.display.setColor(GRAY);
+    gb.display.fillRect(60, gb.display.height()-8, 5, 5);
+    if (settingsPos == 1 )
+    {
+      auto colXpos = 47;
+      if (bgColorPos == 1)
+        colXpos = 55;
+      else if (bgColorPos == 2)
+        colXpos = 63;
+      gb.display.setColor(WHITE);
+      gb.display.drawRect(colXpos, gb.display.height()-17, 7, 7);
+    }
+    else if (settingsPos == 2)
+    {
+      auto colXpos = 51;
+      if (wallColorPos == 1)
+        colXpos = 59;
+      gb.display.setColor(WHITE);
+      gb.display.drawRect(colXpos, gb.display.height()-9, 7, 7);
+    }
+  }
 }
 
 
 void showCredits()
 {
+  gb.display.clear();
+  while (true) {
+    if (!gb.update())
+        continue;
     gb.display.clear();
-    gb.display.setFont(font5x7);
-    while (true) {
-        if (!gb.update())
-            continue;
-        gb.display.setFont(font3x5);
-        gb.display.println(F("META v0.1 Oct12"));
-        gb.display.println(F("CC-BY-SA 2018"));
-        gb.display.println(F("Lady Awesome"));
-        gb.display.println(F("MakerSquirrel"));
-        gb.display.println(F("  HighScore code"));
-        gb.display.println(F("  by R0d0t"));
-        if (gb.buttons.pressed(BTN_A) || gb.buttons.pressed(BTN_B) || gb.buttons.pressed(BTN_C)) {
-            gb.sound.playOK();
-            break;
-        }
+    gb.display.setColor(g_gameSettings.bgColor);
+    gb.display.fillRect(0, 0, gb.display.width(), gb.display.height());
+    gb.display.setColor(ORANGE);
+    gb.display.drawRect(0, 0, gb.display.width(), gb.display.height());
+    gb.display.setColor(BLACK, g_gameSettings.bgColor);
+    gb.display.cursorX = 10;
+    gb.display.cursorY = 5;
+    gb.display.println(F("Snake 5110"));
+    gb.display.cursorX = 5;
+    gb.display.println(F("META v1.1 Dec15"));
+    gb.display.cursorX = 5;
+    gb.display.println(F("CC-BY-SA 2018"));
+    gb.display.cursorX = 5;
+    gb.display.println(F("Lady Awesome"));
+    gb.display.cursorX = 5;
+    gb.display.println(F("MakerSquirrel"));
+    gb.display.cursorX = 5;
+    gb.display.println(F("R0d0t (Highscore)"));
+    if (gb.buttons.pressed(BUTTON_A) || gb.buttons.pressed(BUTTON_B) || gb.buttons.pressed(BUTTON_MENU)) {
+        gb.sound.playOK();
+        break;
     }
+  }
 }
 
 
 /// triggered whenever we want to start the game
 void initGame(bool useClassicMode) {
-    gb.battery.show = false; //hide the battery indicator
     g_isClassicMode = useClassicMode;
     gb.pickRandomSeed(); //pick a different random seed each time for games to be different
 
@@ -371,6 +522,7 @@ void initGame(bool useClassicMode) {
         g_snake.addCoordinate(Coordinate(0,c_rasterY-1));
         Coordinate::g_nomPos = Coordinate(c_rasterX/2, c_rasterY/2);;
         g_lastButtonPressed = RIGHT;
+        g_lastTimeButtonPressed = RIGHT;
     }
     else
     {
@@ -378,6 +530,7 @@ void initGame(bool useClassicMode) {
       Coordinate::g_snakePos = Coordinate(c_rasterX/2, c_rasterY/2);
       g_snake.addCoordinate(Coordinate::g_snakePos);
       g_lastButtonPressed = PAUSE;
+      g_lastTimeButtonPressed = PAUSE;
       gb.display.setFont(font3x5);
       setNewNomPos();
       for(auto i = 0 ; i <= c_rasterX; i++)
@@ -389,155 +542,55 @@ void initGame(bool useClassicMode) {
     }
     g_growNom = 0;
     g_score = 0;
-    g_levelModuloHelper = c_maxLevel + 1 - g_gameLevel;
+    g_levelModuloHelper = c_maxLevel + 1 - g_gameSettings.level;
     g_delayCounter = 0;
     if (c_debug)
         gb.display.setFont(font3x5);
 }
 
 
-//Based on code from Crabator, by Rodot
-void loadHighscores(bool useClassicMode)
-{
-    int16_t offset = useClassicMode ? HIGHSCORE_COUNT * (NAME_LETTERS+3) : 0;
-    auto& highScores = useClassicMode ? g_highScoresClassic : g_highscoreScores;
-    auto& names = useClassicMode ? g_highScoreNamesClassic : g_highscoreNames;
-    auto& minScore = useClassicMode ? g_minHighScoreClassic : g_minHighscore;
-    for (uint8_t j = 0; j < HIGHSCORE_COUNT; j++) {
-        for (uint8_t i = 0; i < NAME_LETTERS; i++)
-            { names[j][i] = EEPROM.read(offset + i + j * (NAME_LETTERS + 2)); }
-        highScores[j] = EEPROM.read(offset + NAME_LETTERS + j * (NAME_LETTERS + 2)) & 0x00FF; //LSB
-        highScores[j] += (EEPROM.read(offset + NAME_LETTERS + 1 + j * (NAME_LETTERS + 2)) << 8) & 0xFF00; //MSB
-        highScores[j] = (highScores[j] == 0xFFFF) ? 0 : highScores[j];
-        minScore = highScores[j];
-    }
-}
-
-
-void saveHighscore(bool useClassicMode)
-{
-    int16_t offset = useClassicMode ? HIGHSCORE_COUNT * (NAME_LETTERS+3) : 0;
-    auto& highScores = useClassicMode ? g_highScoresClassic : g_highscoreScores;
-    auto& names = useClassicMode ? g_highScoreNamesClassic : g_highscoreNames;
-    auto& minScore = useClassicMode ? g_minHighScoreClassic : g_minHighscore;
-    gb.getDefaultName(names[HIGHSCORE_COUNT - 1]);
-    gb.keyboard(names[HIGHSCORE_COUNT - 1], NAME_LETTERS + 1);
-    highScores[HIGHSCORE_COUNT - 1] = g_score;
-
-    //Sort highscores
-    for (uint8_t i = HIGHSCORE_COUNT - 1; i > 0; i--) {
-        if (highScores[i - 1] >= highScores[i])
-            { break; }
-        char tempName[NAME_LETTERS];
-        strcpy(tempName, names[i - 1]);
-        strcpy(names[i - 1], names[i]);
-        strcpy(names[i], tempName);
-        unsigned int tempScore;
-        tempScore = highScores[i - 1];
-        highScores[i - 1] = highScores[i];
-        highScores[i] = tempScore;
-
-    }
-    //update minimum highscore
-    minScore = highScores[HIGHSCORE_COUNT-1];
-
-    //Save highscores in EEPROM
-    for (uint8_t j = 0; j < HIGHSCORE_COUNT; j++) {
-        for (uint8_t i = 0; i < NAME_LETTERS; i++)
-            { EEPROM.write(offset + i + j * (NAME_LETTERS + 2), names[j][i]); }
-        EEPROM.write(offset + NAME_LETTERS + j * (NAME_LETTERS + 2), highScores[j] & 0x00FF); //LSB
-        EEPROM.write(offset + NAME_LETTERS + 1 + j * (NAME_LETTERS + 2), (highScores[j] >> 8) & 0x00FF); //MSB
-    }
-}
-
-
-void drawHighScores(bool useClassicMode) {
-  gb.display.setFont(font3x5);
-  const auto& highScores = useClassicMode ? g_highScoresClassic : g_highscoreScores;
-  const auto& names = useClassicMode ? g_highScoreNamesClassic : g_highscoreNames;
-  while (true) {
-    if (!gb.update())
-        continue;
-    gb.display.drawRect(0, 0, LCDWIDTH, LCDHEIGHT);
-
-    //Title
-    gb.display.cursorX = useClassicMode ? 4 : 20;
-    gb.display.cursorY = 3;
-    if (useClassicMode)
-        { gb.display.println(F("CLASSIC HIGH SCORES")); }
-    else
-        { gb.display.println(F("HIGH SCORES")); }
-
-    gb.display.cursorY = gb.display.fontHeight * 2;
-    for (uint8_t i = 0; i < HIGHSCORE_COUNT; i++) {
-        gb.display.cursorX = 6;
-
-        //Name
-        if (highScores[i] == 0)
-            { gb.display.print('-'); }
-        else
-            { gb.display.print(names[i]); }
-
-        //Score
-        if (highScores[i] > 9999) {
-            gb.display.cursorX = LCDWIDTH - 6 - 5 * gb.display.fontWidth;
-        } else if (highScores[i] > 999) {
-            gb.display.cursorX = LCDWIDTH - 6 - 4 * gb.display.fontWidth;
-        } else if (highScores[i] > 99) {
-            gb.display.cursorX = LCDWIDTH - 6 - 3 * gb.display.fontWidth;
-        } else if (highScores[i] > 9) {
-            gb.display.cursorX = LCDWIDTH - 6 - 2 * gb.display.fontWidth;
-        } else {
-            gb.display.cursorX = LCDWIDTH - 6 - gb.display.fontWidth;
-        }
-        gb.display.cursorY = (gb.display.fontHeight * 2) + (gb.display.fontHeight * i);
-        gb.display.println(highScores[i]);
-    }
-
-    if (gb.buttons.pressed(BTN_A) || gb.buttons.pressed(BTN_B) || gb.buttons.pressed(BTN_C)) {
-        gb.sound.playOK();
-        break;
-    }
-  }
-}
-
-
 void drawArena()
 {
-  gb.display.drawRect(0, 0, LCDWIDTH, LCDHEIGHT);
+  gb.display.setColor(g_gameSettings.bgColor);
+  gb.display.fillRect(0, 0, gb.display.width(), gb.display.height());
+  gb.lights.fill(g_gameSettings.bgColor);
+  gb.display.setColor(g_gameSettings.wallColor);
+  gb.display.drawRect(0, 0, gb.display.width(), gb.display.height());
+  if (g_lastButtonPressed == PAUSE)
+  {
+    gb.display.cursorX = 2;
+    gb.display.cursorY = 2;
+    gb.display.setColor(GRAY);
+    gb.display.print(g_score);
+  }
   if (g_isClassicMode)
     return;
-  gb.display.setColor(WHITE, WHITE);
   /// remove torn down wall parts
+  gb.display.setColor(g_gameSettings.bgColor);
   if (g_xWallsRemoved[0])
   {
     gb.display.fillRect(0, 0, 5, 2);
-    gb.display.fillRect(0, LCDHEIGHT-1, 5, 2);
+    gb.display.fillRect(0, gb.display.height()-1, 5, 2);
   }
   if (g_yWallsRemoved[0])
   {
+
     gb.display.fillRect(0, 0, 2, 5);
-    gb.display.fillRect(LCDWIDTH-1, 0, 2, 5);
+    gb.display.fillRect(gb.display.width()-1, 0, 2, 5);
   }
   for(uint8_t i = 1; i < c_rasterX; i++)
   {
     if (!g_xWallsRemoved[i]) continue;
     gb.display.fillRect(i*4+1, 0, 5, 2);
-    gb.display.fillRect(i*4+1, LCDHEIGHT-1, 5, 2);
+    gb.display.fillRect(i*4+1, gb.display.height()-1, 5, 2);
   }
   for(uint8_t i = 1; i < c_rasterY; i++)
   {
     if (!g_yWallsRemoved[i]) continue;
     gb.display.fillRect(0, i*4+1, 2, 5);
-    gb.display.fillRect(LCDWIDTH-1, i*4+1, 2, 5);
+    gb.display.fillRect(gb.display.width()-1, i*4+1, 2, 5);
   }
-  gb.display.setColor(BLACK, WHITE);
-  if (g_lastButtonPressed == PAUSE)
-  {
-    gb.display.cursorX = 2;
-    gb.display.cursorY = 2;
-    gb.display.print(g_score);
-  }
+  gb.display.setColor(BLACK, g_gameSettings.bgColor);
   if (!c_debug)
     return;
   gb.display.cursorX = 1;
@@ -559,63 +612,73 @@ void drawArena()
 
 void drawSnake(int8_t direction, bool timeChanged)
 {
-    if (timeChanged)
+  gb.display.setColor(g_gameSettings.bgColor);
+  if (g_growNom > 0)
+  {
+    uint ledColumn = Coordinate::g_snakePos.x() > c_rasterX/2 ? 1 : 0;
+    int8_t y = Coordinate::g_snakePos.y();
+    uint ledRow = y < c_rasterY/4 ? 0 : y < c_rasterY/2 ? 1 : 3*c_rasterY/4 ? 2 : 3;
+    gb.lights.drawPixel(ledColumn, ledRow, ORANGE);
+  }
+  if (timeChanged)
+  {
+    bool hasMoved = Coordinate::g_snakePos.move(direction, g_isClassicMode, isOutOfBounds(Coordinate::g_snakePos), Coordinate::g_snakePos.isInArena());
+    if (hasMoved)
     {
-      bool hasMoved = Coordinate::g_snakePos.move(direction, g_isClassicMode, isOutOfBounds(Coordinate::g_snakePos), Coordinate::g_snakePos.isInArena());
-        if (hasMoved)
-        {
-            if (g_growNom > 0)
-            {
-                g_snake.addCoordinate(Coordinate()); // dummy coordinate, is updated in moveCoordinates
-                g_growNom -= 1;
-            }
-            g_snake.moveCoordinates(Coordinate::g_snakePos);
-            if (c_debug) 
-            {
+      if (g_growNom > 0)
+      {
+        g_snake.addCoordinate(Coordinate()); // dummy coordinate, is updated in moveCoordinates
+        g_growNom -= 1;
+      }
+      g_snake.moveCoordinates(Coordinate::g_snakePos);
+      if (c_debug)
+      {
 //                 g_cpuLoad = gb.getCpuLoad();
-                g_ramUsage = gb.getFreeRam();
-            }
-        }            
+//                 g_ramUsage = gb.getFreeRam();
+      }
     }
-    
-    if (c_debug) 
-    {
-        gb.display.cursorX = 10;
-        gb.display.cursorY = 3;
+  }
+
+  if (c_debug)
+  {
+    gb.display.cursorX = 10;
+    gb.display.cursorY = 3;
 //         gb.display.print(F("CPU/RAM: "));
 //         // this itself does actually cost a lot of performance!
 //         gb.display.print(g_cpuLoad);
 //         gb.display.print(F("/"));
-        gb.display.print(g_ramUsage);
-    }
-    uint8_t size = g_snake.size();
-    for (int index = 0; index < size; index++) /// draw step
-    {    
-      const Coordinate& coord = g_snake.get(index);
-      int8_t xPixel = coord.xPixel();
-      int8_t yPixel = coord.yPixel();
-      gb.display.drawFastHLine(xPixel, yPixel, 3);
-      gb.display.drawFastHLine(xPixel, yPixel+1, 3);
-      gb.display.drawFastHLine(xPixel, yPixel+2, 3);
-      
-      if (index > 0) /// polish step (fills gaps between the segments)
+    gb.display.print(g_ramUsage);
+  }
+  uint8_t size = g_snake.size();
+  gb.display.setColor(BLACK, g_gameSettings.bgColor);
+  for (int index = 0; index < size; index++) /// draw step
+  {
+    const Coordinate& coord = g_snake.get(index);
+    int8_t xPixel = coord.xPixel();
+    int8_t yPixel = coord.yPixel();
+    gb.display.drawFastHLine(xPixel, yPixel, 3);
+    gb.display.drawFastHLine(xPixel, yPixel+1, 3);
+    gb.display.drawFastHLine(xPixel, yPixel+2, 3);
+
+    if (index > 0) /// polish step (fills gaps between the segments)
+    {
+      const Coordinate& otherCoord = g_snake.get(index-1);
+      int8_t deltaX = coord.x() - otherCoord.x();
+      int8_t deltaY = coord.y() - otherCoord.y();
+      if (abs(deltaX) < 2 && abs(deltaY) < 2) /// skip parts where snake passes through wall gaps
       {
-        const Coordinate& otherCoord = g_snake.get(index-1);
-        int8_t deltaX = coord.x() - otherCoord.x();
-        int8_t deltaY = coord.y() - otherCoord.y();
-        if (abs(deltaX) < 2 && abs(deltaY) < 2) /// skip parts where snake passes through wall gaps
-        {
-          gb.display.drawFastHLine(xPixel-deltaX, yPixel-deltaY, 3);
-          gb.display.drawFastHLine(xPixel-deltaX, yPixel-deltaY+1, 3);
-          gb.display.drawFastHLine(xPixel-deltaX, yPixel-deltaY+2, 3);
-        }
+        gb.display.drawFastHLine(xPixel-deltaX, yPixel-deltaY, 3);
+        gb.display.drawFastHLine(xPixel-deltaX, yPixel-deltaY+1, 3);
+        gb.display.drawFastHLine(xPixel-deltaX, yPixel-deltaY+2, 3);
       }
     }
+  }
 }
 
 
 void drawPrey()
 {
+  gb.display.setColor(BLACK, g_gameSettings.bgColor);
   gb.display.drawCircle(Coordinate::g_nomPos.xPixel()+1, Coordinate::g_nomPos.yPixel()+1, 1);
   if (g_isClassicMode)
     return;
@@ -641,14 +704,14 @@ void setNewNomPos()
   Coordinate::g_shrinkNomPos.setOffBounds();
   Coordinate::g_growNomPos.setOffBounds();
   Coordinate::g_wallNomPos.setOffBounds();
-  if (g_snake.size() < 8)
+  if (g_snake.size() < 6)
     return;
   uint8_t rngVal = random(0, 38);
   if (rngVal == 4 || rngVal == 2 || rngVal == 3 || rngVal == 33)
     Coordinate::g_shrinkNomPos = g_snake.getRandomFreePos();
   else if (rngVal == 23 || rngVal == 5 || rngVal == 7 || rngVal == 29)
     Coordinate::g_growNomPos = g_snake.getRandomFreePos();
-  else if (rngVal == 13 || rngVal == 37 || rngVal == 1)
+  else if (rngVal == 13 || rngVal == 37 || rngVal == 1 || rngVal == 13)
     Coordinate::g_wallNomPos = g_snake.getRandomFreePos();
 }
 
@@ -656,36 +719,38 @@ void setNewNomPos()
 /// returns true if any of the prey types have been eaten
 bool snakeHasPrey()
 {
-  bool shrinkNom = false, wallNom = false;
+  bool nom = false;
   if (Coordinate::g_nomPos == Coordinate::g_snakePos)
   {
     g_growNom += 1; // will be count down until growing is complete (g_growNom == 0)
-    g_score+=g_gameLevel;
+    g_score+=g_gameSettings.level;
+    nom = true;
+    gb.sound.fx(nomFX);
   }
   else if (!g_isClassicMode && Coordinate::g_shrinkNomPos == Coordinate::g_snakePos)
   {
-    shrinkNom = true;
+    nom = true;
     g_snake.shrink(4);
     g_score-=4;
+    gb.sound.fx(shrinkNomFX);
   }
   else if (!g_isClassicMode && Coordinate::g_growNomPos == Coordinate::g_snakePos)
   {
+    nom = true;
     g_growNom += 3; // will be count down to zero until growing is complete
-    g_score+= 3*g_gameLevel;
+    g_score+= 3*g_gameSettings.level;
+    gb.sound.fx(growNomFX);
   }
   else if (!g_isClassicMode && Coordinate::g_wallNomPos == Coordinate::g_snakePos)
   {
-    wallNom = true;
-    g_score+=g_gameLevel;
+    nom = true;
+    g_score+=g_gameSettings.level;
     deleteRandomWallElement();
+    gb.sound.fx(wallNomFX);
   }
-  
-  if (shrinkNom || wallNom || g_growNom == 3)
-  {
-    gb.sound.playNote(54, 1, 0);
+
+  if (nom)
     return true;
-  }
-  
   return false;
 }
 
@@ -696,47 +761,43 @@ bool wallCollision()
 
 
 void gameOver(bool wallCrash)
-  {
-    gb.sound.playNote(0, 3, 0);
-
-    if (wallCrash)
-        gb.popup("Wallcrash!",9);
-    else
-        gb.popup("Snakebite!",9);
-
-    if ((g_isClassicMode and (g_score > g_minHighScoreClassic)) or (!g_isClassicMode and (g_score > g_minHighscore)))
-    {
-      showScore();
-      saveHighscore(g_isClassicMode);
-      showHighscore(g_isClassicMode);
-      return;
-    }
-    showScore();
-    showHighscore(g_isClassicMode);
-}
-
-
-void showScore()
 {
-    gb.display.clear();
-    gb.display.setFont(font5x7);
-    while (true) {
-        if (!gb.update())
-            continue;
-        gb.display.cursorY = 3;
-        gb.display.cursorX = 14;
-        gb.display.println(F("GAME OVER!"));
-        gb.display.println(F(""));
-        gb.display.cursorX = 12;
-        gb.display.println(F("YOUR SCORE:"));
-        gb.display.cursorX = 30;
-        gb.display.println(g_score);
-        gb.display.cursorX = 0;
-        if ((g_isClassicMode and (g_score > g_minHighScoreClassic)) or (!g_isClassicMode and (g_score > g_minHighscore)))
-            gb.display.println(F("NEW HIGHSCORE!"));
-        if (gb.buttons.pressed(BTN_A) || gb.buttons.pressed(BTN_B) || gb.buttons.pressed(BTN_C))
-            { break; }
+  gb.display.setColor(g_gameSettings.bgColor);
+  if (wallCrash)
+    gb.gui.popup("Wallcrash!",9);
+  else
+    gb.gui.popup("Snakebite!",9);
+
+  if (g_isClassicMode)
+  {
+    bool newHighScore = g_classicHighscore.checkHighScore(g_score);
+    if (newHighScore)
+      gb.sound.fx(highscoreFX);
+    else
+      gb.sound.fx(gameoverFX);
+    g_classicHighscore.showScore(g_score);
+    if (newHighScore)
+    {
+      g_classicHighscore.updateHighscore(g_score);
+      gb.save.set( SAVE_CLASSIC , g_classicHighscore );
     }
+    g_classicHighscore.drawHighScores();
+  }
+  else
+  {
+    bool newHighScore = g_metaHighscore.checkHighScore(g_score);
+    if (newHighScore)
+      gb.sound.fx(highscoreFX);
+    else
+      gb.sound.fx(gameoverFX);
+    g_metaHighscore.showScore(g_score);
+    if (newHighScore)
+    {
+      g_metaHighscore.updateHighscore(g_score);
+      gb.save.set( SAVE_META , g_metaHighscore );
+    }
+    g_metaHighscore.drawHighScores();
+  }
 }
 
 

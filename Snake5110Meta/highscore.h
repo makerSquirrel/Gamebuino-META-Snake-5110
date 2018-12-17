@@ -22,9 +22,9 @@ static uint16_t getCurrentOffset();
 public:
   HighScore(char* name = nullptr, Color textColor = WHITE, Color bgColor = BLACK) : m_minHighScore(0), m_ROMOffset(HighScore::getCurrentOffset()), m_textColor(textColor), m_bgColor(bgColor), m_nameIsSet(false)
   { setName(name); }
-  
-  void setTextColor(Color& newCol) { m_textColor = newCol; }
-  void setBgColor(Color& newCol) { m_bgColor = newCol; }
+
+  void setTextColor(const Color& newCol) { m_textColor = newCol; }
+  void setBgColor(const Color& newCol) { m_bgColor = newCol; }
   void setName(char* name)
   {
     if (!name)
@@ -32,7 +32,7 @@ public:
     strcpy(m_name,name);
     m_nameIsSet = true;
   }
-    
+
 /// returns true if given value is a new highscore:
 bool showScore(uint16_t score);
 
