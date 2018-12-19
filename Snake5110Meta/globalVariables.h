@@ -15,7 +15,6 @@ static const uint16_t g_arenaSize = (c_rasterX)*(c_rasterY);
 #define PAUSE -1
 
 /** ******************   GLOBAL VARIABLES: */
-volatile static bool g_isClassicMode; // always set when game starts
 volatile static int8_t g_growNom; // standard nom +1, growNom will increase the snake length by 3
 volatile static int16_t g_score;
 volatile static int16_t g_cpuLoad; // for debugging
