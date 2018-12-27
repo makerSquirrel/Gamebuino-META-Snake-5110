@@ -35,7 +35,7 @@ HighScore g_classicHighscore = HighScore("Classic", g_colorNom, CustomColors::s_
 HighScore g_metaHighscore = HighScore("Meta", g_colorNom, CustomColors::s_bgClassicBlue);
 #define SAVE_META 1
 HighScore g_snake2Highscore = HighScore("Wall-less", g_colorNom, CustomColors::s_bgNokiaBlue);
-#define SAVE_SNAKE2 2
+#define SAVE_SNAKE2 3
 
 /// used to store save-able stuff.
 struct GameSettings {
@@ -79,11 +79,12 @@ struct GameSettings {
 };
 
 GameSettings g_gameSettings = GameSettings();
-#define SAVE_SETTINGS 3
+#define SAVE_SETTINGS 4
 
 const SaveDefault savefileDefaults[] = {
   { SAVE_CLASSIC, SAVETYPE_BLOB, sizeof(g_classicHighscore), 0 },
   { SAVE_META, SAVETYPE_BLOB, sizeof(g_metaHighscore), 0 },
+  { 2, SAVETYPE_INT, 1, 0 },
   { SAVE_SNAKE2, SAVETYPE_BLOB, sizeof(g_snake2Highscore), 0 },
   { SAVE_SETTINGS, SAVETYPE_BLOB, sizeof(g_gameSettings), 0 }
 };
@@ -193,13 +194,6 @@ void setup() {
   g_cpuLoad = 0;
   g_ramUsage = 0;
   gb.display.init(80, 64, ColorMode::rgb565);
-  gb.save.config(savefileDefaults);
-  gb.save.get(SAVE_SETTINGS, g_gameSettings);
-  if (!g_gameSettings.initialized)
-  {
-
-    g_gameSettings = GameSettings();
-  }
   gb.display.setColor(BLACK, CustomColors::s_bgClassicBlue);
   gb.save.get(SAVE_CLASSIC, g_classicHighscore);
   g_classicHighscore.setName("Classic");
@@ -209,10 +203,20 @@ void setup() {
   g_metaHighscore.setName("   Meta");
   g_metaHighscore.setTextColor(g_colorNom);
   g_metaHighscore.setBgColor(CustomColors::s_bgClassicBlue);
-  gb.save.get(SAVE_META, g_snake2Highscore);
-  g_snake2Highscore.setName("Wall-less");
-  g_snake2Highscore.setTextColor(g_colorNom);
-  g_snake2Highscore.setBgColor(CustomColors::s_bgNokiaBlue);
+
+  if (gb.save.get(2) == 1) // new file system
+  {
+    gb.save.get(SAVE_SETTINGS, g_gameSettings);
+    if (!g_gameSettings.initialized)
+      { g_gameSettings = GameSettings(); }
+    gb.save.get(SAVE_SNAKE2, g_snake2Highscore);
+    g_snake2Highscore.setName("Wall-less");
+    g_snake2Highscore.setTextColor(g_colorNom);
+    g_snake2Highscore.setBgColor(CustomColors::s_bgNokiaBlue);
+  }
+  else
+    { g_gameSettings = GameSettings(); }
+  gb.save.config(savefileDefaults);
 }
 
 
