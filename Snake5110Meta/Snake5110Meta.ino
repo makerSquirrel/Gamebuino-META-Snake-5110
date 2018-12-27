@@ -89,6 +89,11 @@ const SaveDefault savefileDefaults[] = {
   { SAVE_SETTINGS, SAVETYPE_BLOB, sizeof(g_gameSettings), 0 }
 };
 
+const SaveDefault oldSavefileDefaults[] = {
+  { SAVE_CLASSIC, SAVETYPE_BLOB, sizeof(g_classicHighscore), 0 },
+  { SAVE_META, SAVETYPE_BLOB, sizeof(g_metaHighscore), 0 }
+};
+
 
 /// game-mode-specific stuff, which is runtime relevant only
 struct GameMode {
@@ -194,18 +199,25 @@ void setup() {
   g_cpuLoad = 0;
   g_ramUsage = 0;
   gb.display.init(80, 64, ColorMode::rgb565);
+  gb.tft.setCursor(0, 20);
+	gb.tft.setColor(Color::red, Color::black);
+	gb.tft.print("setupBegin");
   gb.display.setColor(BLACK, CustomColors::s_bgClassicBlue);
-  gb.save.get(SAVE_CLASSIC, g_classicHighscore);
-  g_classicHighscore.setName("Classic");
-  g_classicHighscore.setTextColor(g_colorNom);
-  g_classicHighscore.setBgColor(CustomColors::s_bgNokiaGreen);
-  gb.save.get(SAVE_META, g_metaHighscore);
-  g_metaHighscore.setName("   Meta");
-  g_metaHighscore.setTextColor(g_colorNom);
-  g_metaHighscore.setBgColor(CustomColors::s_bgClassicBlue);
 
   if (gb.save.get(2) == 1) // new file system
   {
+    gb.tft.setCursor(0, 30);
+  	gb.tft.setColor(Color::red, Color::black);
+  	gb.tft.print(" saveGet 2 == 1");
+    gb.save.config(savefileDefaults);
+    gb.save.get(SAVE_CLASSIC, g_classicHighscore);
+    g_classicHighscore.setName("Classic");
+    g_classicHighscore.setTextColor(g_colorNom);
+    g_classicHighscore.setBgColor(CustomColors::s_bgNokiaGreen);
+    gb.save.get(SAVE_META, g_metaHighscore);
+    g_metaHighscore.setName("   Meta");
+    g_metaHighscore.setTextColor(g_colorNom);
+    g_metaHighscore.setBgColor(CustomColors::s_bgClassicBlue);
     gb.save.get(SAVE_SETTINGS, g_gameSettings);
     if (!g_gameSettings.initialized)
       { g_gameSettings = GameSettings(); }
@@ -215,8 +227,33 @@ void setup() {
     g_snake2Highscore.setBgColor(CustomColors::s_bgNokiaBlue);
   }
   else
-    { g_gameSettings = GameSettings(); }
-  gb.save.config(savefileDefaults);
+  {
+    gb.tft.setCursor(0, 40);
+    gb.tft.setColor(Color::red, Color::black);
+    gb.tft.print(" saveGet 2 != 1");
+    gb.save.config(oldSavefileDefaults);
+    gb.save.get(SAVE_CLASSIC, g_classicHighscore);
+    g_classicHighscore.setName("Classic");
+    g_classicHighscore.setTextColor(g_colorNom);
+    g_classicHighscore.setBgColor(CustomColors::s_bgNokiaGreen);
+    gb.save.get(SAVE_META, g_metaHighscore);
+    g_metaHighscore.setName("   Meta");
+    g_metaHighscore.setTextColor(g_colorNom);
+    g_metaHighscore.setBgColor(CustomColors::s_bgClassicBlue);
+    gb.tft.setCursor(33, 40);
+    gb.tft.setColor(Color::red, Color::black);
+    gb.tft.print(" delete old stuff");
+    gb.save.del(SAVE_CLASSIC);
+    gb.save.del(SAVE_META);
+    gb.save.config(savefileDefaults);
+    g_gameSettings = GameSettings();
+    gb.save.set(2, 1);
+    gb.save.set(SAVE_SETTINGS, g_gameSettings);
+    gb.save.set(SAVE_SNAKE2, g_snake2Highscore);
+  }
+  gb.tft.setCursor(0, 50);
+  gb.tft.setColor(Color::red, Color::black);
+  gb.tft.print(" setup done!");
 }
 
 
